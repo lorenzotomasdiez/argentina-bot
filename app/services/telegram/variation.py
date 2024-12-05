@@ -1,9 +1,10 @@
 from config import get_month_from_date
 from services.variation.variation import calculate_products_more_variation
 from .send import send_message
+from services.visualizations.index import generate_variation_bar_chart
 
-def send_general_variation():
-    variation = calculate_products_more_variation()
+def send_general_variation(market_id, today=None):
+    variation = calculate_products_more_variation(market_id, today)
 
     products = variation.get("products")
     price_variation = variation.get("price_variation")
@@ -25,6 +26,8 @@ def send_general_variation():
 
     generate_negative_message = generate_negative_variation_message(products, to_var)
     send_message(generate_negative_message)
+    
+    generate_variation_bar_chart(products, to_var, market_name="Coto")
 
     return {"success": "General Variation Sent"}
 
@@ -37,7 +40,7 @@ def generate_general_message(price_variation, to_var):
         EXAMPLE MESSAGE:
         La variación de precios de la canasta básica en el mes de Abril al día 22 es del 1.94%.
     """
-    message_to_send = f"La variación de precios de la canasta básica en el mes de {to_month} al día {to_day} es del {price_variation}%."
+    message_to_send = f"La variación de precios de la canasta básica en el mes de {to_month} al día {to_day} es del {round(price_variation, 2)}%."
     return message_to_send
 
 def generate_most_variation_message(products, to_var):

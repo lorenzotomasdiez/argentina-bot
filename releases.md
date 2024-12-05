@@ -1,4 +1,31 @@
-# Current v0.1.0
+# Current v0.2.0
+
+# Release Notes - v0.2.0
+
+## New Features
+
+### PLOT Creation
+- [NEW] Added a plot for the 20 products with the most variation in the last 30 days
+
+### DB Backup
+- [NEW] Instead csv backup, now the project has a .gz backup of the database
+
+### FIX COTTO SERVICE
+- [FIX] Fixed the Cotto service: it takes unit price when no kg price is available
+
+### ADD SCRAP DIA SERVICE
+- [NEW] Added scrap service for Dia Market
+
+### ADD TWITTER SERVICE
+- [NEW] Added tweet option for both bots
+- [NEW] Added media upload option for both bots
+
+### ADD CARREFOUR LIST
+
+- Added list of products from Carrefour to the project in csv format
+- Create seeder of products_markets for the Carrefour list
+
+### ADD CARREFOUR SCRAP SERVICE
 
 # Release Notes - v0.1.0
 
@@ -14,6 +41,8 @@
 - Backup csv-xlsx: Implemented a backup service to store data locally by creating a new date copy of prices.csv, prices_long_list.csv, prices.xlsx
 
 - Telegram service: Implemented a Telegram service to send messages to a specific chat_id.
+
+  - Implemented general messages of the calculated variation. General variation, products with more variation and products with more reduction.
 
 - Variation calculation service: Implemented a service to calculate the variation between the last two prices of a specific product.
 

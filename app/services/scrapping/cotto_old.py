@@ -1,5 +1,6 @@
 import re
-from bs4 import BeautifulSoup # type: ignore
+import datetime as dt
+from bs4 import BeautifulSoup
 from services.db.prices.index import get_prices
 from services.db.products_markets.index import get_all_products_markets
 from selenium import webdriver # type: ignore
@@ -7,7 +8,7 @@ from selenium.webdriver.common.by import By # type: ignore
 from selenium.webdriver.support.ui import WebDriverWait # type: ignore
 from selenium.webdriver.support import expected_conditions as EC # type: ignore
 from selenium.common.exceptions import TimeoutException # type: ignore
-from config import SELENIUM_HOST, SELENIUM_PORT, get_date_now
+from config import SELENIUM_HOST, SELENIUM_PORT
 
 
 index_error = []
@@ -18,52 +19,35 @@ index_error = []
 :param portion: the amount of the product you want to buy, defaults to 1 (optional)
 :return: the value of the variable "list"
 """
-def kg(product, page, result):
-    id = str(product["product_id"])
-    quantity = product["quantity"]
+def kilo(id, page, list, portion=1):
     product_info_container = page.find_all("div", id="productInfoContainer")
     disponibility = product_info_container[0].find_all(
         "div", class_="product_not_available"
     )
 
     if disponibility:
-        result.update({id: 0})
-        # GUARDAR ERROR EN DB
-        print(f"SCRAPPING_SERVICE - cotto.py - kilo: {id} no disponible, {result[id]}")
+        list.update({id: 0})
+        #SHOULD SAVE ERROR ON DB
+        print(f"SCRAPPING_SERVICE - cotto.py - kilo: {id} not available, {list[id]}")
         return None
 
     try:
-        value_span = product_info_container[0].find("span", class_="unit")
-        default_value_span = product_info_container[0].find("span", class_="atg_store_newPrice")
-        # Asignación de value considerando la existencia de value_span y la longitud del texto dentro del span
-        value_text = value_span.get_text() if value_span else None
-        value = value_text if value_text and len(value_text.strip()) > 0 else None
-
-        # Asignación de default_value considerando la existencia de default_value_span y la longitud del texto dentro del span
-        default_value_text = default_value_span.get_text() if default_value_span else None
-        default_value = default_value_text if default_value_text and len(default_value_text.strip()) > 0 else None
-
-        # Si el valor principal está presente, busca el precio en él
-        if value:
-            match = re.search(r"\$([\d,.]+)", value)
-            if match:
-                number = float(match.group(1).replace(".", "").replace(",", "."))
-                result.update({id: number * quantity})
-            else:
-                result.update({id: 0})
-                print(f"SCRAPPING_SERVICE - cotto.py - kilo: {id} no encontrado, {result[id]}")
-        # Si el valor principal no está presente pero hay un valor de respaldo, busca el precio en él
-        elif default_value:
-            match = re.search(r"\$([\d,.]+)", default_value)
-            if match:
-                number = float(match.group(1).replace(".", "").replace(",", "."))
-                result.update({id: number * quantity})  # Guarda el precio de respaldo con una clave diferente
-            else:
-                result.update({id: 0})
-                print(f"SCRAPPING_SERVICE - cotto.py - kilo: {id} no encontrado en valor de respaldo, {result[id + '_backup']}")
+        # search inside product_info_container the span with the class unit
+        value = product_info_container[0].find_all("span", class_="unit")[0].get_text()
     except IndexError:
-        result.update({id: 0})
-        print(f"SCRAPPING_SERVICE - cotto.py - kilo: {id} IndexError, {result[id]}")
+        list.update({id: 0})
+        index_error.append(id)
+        print(f"SCRAPPING_SERVICE - cotto.py - kilo: {id} IndexError, {list[id]}")
+        return None
+
+    match = re.search(r"\$([\d,.]+)", value)
+
+    if match:
+        number = float(match.group(1).replace(".", "").replace(",", "."))
+        list.update({id: number * portion})
+    else:
+        list.update({id: 0})
+        print(f"SCRAPPING_SERVICE - cotto.py - kilo: {id} not found, {list[id]}")
 
 """
 - Take a product name and a URL, and return the price of the product.
@@ -71,17 +55,15 @@ def kg(product, page, result):
 :param product_url: The URL of the product
 :return: the value of the variable "list"
 """
-def unit(product, page, result):
-    id = str(product["product_id"])
-    quantity = product["quantity"]
+def unit(id, page, list):
     product_info_container = page.find_all("div", id="productInfoContainer")
     disponibility = product_info_container[0].find_all(
         "div", class_="product_not_available"
     )
 
     if disponibility:
-        result.update({id: 0})
-        print(f"SCRAPPING_SERVICE - cotto.py - unit: {id} not available, {result[id]}")
+        list.update({id: 0})
+        print(f"SCRAPPING_SERVICE - cotto.py - unit: {id} not available, {list[id]}")
         return None
 
     try:
@@ -91,24 +73,24 @@ def unit(product, page, result):
             .get_text()
         )
     except IndexError:
-        result.update({id: 0})
+        list.update({id: 0})
         index_error.append(id)
-        print(f"SCRAPPING_SERVICE - cotto.py - unit: {id} IndexError, {result[id]}")
+        print(f"SCRAPPING_SERVICE - cotto.py - unit: {id} IndexError, {list[id]}")
         return None
 
     match = re.search(r"\$([\d,.]+)", value)
 
     if match:
         number = float(match.group(1).replace(".", "").replace(",", "."))
-        result.update({id: number / quantity})
+        list.update({id: number})
 
     else:
-        result.update({id: 0})
-        print(f"SCRAPPING_SERVICE - cotto.py - unit: {id} not found, {result[id]}")
+        list.update({id: 0})
+        print(f"SCRAPPING_SERVICE - cotto.py - unit: {id} not found, {list[id]}")
 
 def scrap_cotto():
     result = {
-        "date": get_date_now()
+        "date": dt.datetime.now().strftime("%Y-%m-%d")
     }
     date = result["date"]
 
@@ -141,7 +123,7 @@ def scrap_cotto():
                 driver.get(product["url"])
                 driver.implicitly_wait(10)
                 page = BeautifulSoup(driver.page_source, "html.parser")
-                kg(product, page, result)
+                kilo(str(product["product_id"]), page, result)
             else:
                 print(f"ERROR - SCRAPPING_SERVICE - cotto.py - scrap_cotto: {product['name']} no url")
         elif product["measurement"] == "unit":
@@ -149,12 +131,11 @@ def scrap_cotto():
                 driver.get(product["url"])
                 driver.implicitly_wait(10)
                 page = BeautifulSoup(driver.page_source, "html.parser")
-                unit(product, page, result)
+                unit(str(product["product_id"]), page, result)
             else:
                 print(f"ERROR - SCRAPPING_SERVICE - cotto.py - scrap_cotto: {product['name']} no url")
         if "nan" in result.values():
             print(f"ERROR - SCRAPPING_SERVICE - cotto.py - scrap_cotto: nan in list")
         print(f"SCRAPPING_SERVICE - cotto.py - scrap_cotto: done")
 
-    print(result)
     return result
